@@ -1,0 +1,1 @@
+/home/game/tfTEST/tf2/tf/addons/sourcemod/scripting/halftime.sp
