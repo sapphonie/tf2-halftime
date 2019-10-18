@@ -3,7 +3,7 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.0.3"
+			"Latest"	"1.0.5"
 		}
 		"Notes"	"Check the github for the latest updates!"
 		"Notes"	"https://github.com/stephanieLGBT/5cp-halftime"
