@@ -2,12 +2,19 @@
 
 #include <sourcemod>
 #include <morecolors>
+#undef REQUIRE_PLUGIN
+#include <updater>
+
+#define PLUGIN_VERSION	"1.0.3"
+#define UPDATE_URL	"https://github.com/stephanieLGBT/5cp-halftime/blob/master/updatefile.txt"
+
+
 
 public Plugin myinfo = {
 	name			= "basic halftime for 5cp",
 	author			= "stephanie",
 	description	= "emulates esea style halves for 5cp",
-	version		= "1.0.1",
+	version		= PLUGIN_VERSION,
 	url				= "https://stephanie.lgbt"
 };
 
@@ -17,6 +24,10 @@ new bool:isHalf2;				// bool value for determining halftime created here
 
 public void OnPluginStart()
 {
+	if (LibraryExists("updater"))
+	{
+		Updater_AddPlugin(UPDATE_URL);
+	}
 	HookEvent("teamplay_round_win", EventRoundEnd); // hooks round win events (duh?)
 	SetConVarInt(FindConVar("mp_winlimit"), 0, true); // finds and sets winlimit to 0, as this plugin handles it instead
 }

@@ -1,0 +1,16 @@
+"Updater" {
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.0.3"
+		}
+		"Notes"	"Check the github for the latest updates!"
+		"Notes"	"https://github.com/stephanieLGBT/5cp-halftime"
+	}
+	"Files"
+	{
+			"Plugin"	"/addons/sourcemod/plugins/5cphalftime.smx"
+			"Plugin"	"/addons/sourcemod/scripting/include/morecolors.inc"
+			"Source"	"/addons/sourcemod/scripting/5cphalftime.sp"
+	}
