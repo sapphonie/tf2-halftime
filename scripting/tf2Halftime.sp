@@ -1,11 +1,11 @@
-#pragma semicolon 1
+#pragma semicolon 1 // enables strict semicolon mode
 
 #include <sourcemod>
 #include <morecolors>
 #undef REQUIRE_PLUGIN
 #include <updater>
 
-#define PLUGIN_VERSION	"1.1.0"
+#define PLUGIN_VERSION	"1.1.2"
 #define UPDATE_URL	"https://raw.githubusercontent.com/stephanieLGBT/tf2-halftime/master/updatefile.txt"
 
 
@@ -46,30 +46,27 @@ public void OnMapStart()
 		half1Limit = 3;
 		totalWinLimit = 5;
 	}
-	
 	else if (strncmp(mapName, "koth_", 5) == 0) // koth... 
 	{
 		half1Limit = 2;
 		totalWinLimit = 4;
 	}
-	
 	else // or something else.
 	{
 		half1Limit = -1;
 		totalWinLimit = -1;
+		CPrintToChatAll("{mediumpurple}[TF2Halftime] {yellow}Warning!{white} TF2Halftime is running on an unsupported map. Expect bugs and/or crashes!"); // plugin should not be running here but if it is say something in chat about it
 	}
 }
 
-
-
 public void OnMapEnd() // resets score and map specific stored vars on map change
 {
-	bluRnds = 0;
-	redRnds = 0;
-	isHalf2 = false;
-	half1Limit = 0;
-	totalWinLimit = 0;
-	tourneyRestart = false;
+	bluRnds = 0; // duh
+	redRnds = 0; // duh
+	isHalf2 = false; // unsets halftime, if set
+	half1Limit = 0; // no set half winlimit until map type is determined above
+	totalWinLimit = 0; // no set winlimit until map type is determined above
+	tourneyRestart = false; // don't restart the tournament on round start
 }
 
 
@@ -78,10 +75,7 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 	int team = event.GetInt("team"); // gets int value of the team who won the round. 2 = red, 3 = blu, anything else is a stalemate
 	int winreason = event.GetInt("winreason"); // gets winreason to prevent incrementing when a stalemate occurs
 
-/**vvv LOGIC HERE vvv **/
-
-// this will get refactored at some point because it's messy
-
+	/**vvv LOGIC HERE vvv**/
 	if (team == 2 && winreason == 1) // RED TEAM NON-STALEMATE WIN EVENT
 	{
 		redRnds++; // increments red round counter by +1
@@ -91,12 +85,14 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 			isHalf2 = true;
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Halftime reached! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
 			tourneyRestart = true;
-		} else if (redRnds == totalWinLimit && isHalf2) // red reaches (totalWinLimit) rounds
+		} 
+		else if (redRnds >= totalWinLimit && isHalf2) // red reaches (totalWinLimit) rounds
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}The game is over, and {red}Red{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
 			tourneyRestart = true;
 		}
-	} else if (team == 3 && winreason == 1) // BLU TEAM NON-STALEMATE WIN EVENT
+	}
+	else if (team == 3 && winreason == 1) // BLU TEAM NON-STALEMATE WIN EVENT
 	{
 		bluRnds++; // increments blu round counter by +1
 		CPrintToChatAll("{mediumpurple}[TF2Halftime] {blue}Blu{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
@@ -105,53 +101,81 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 			isHalf2 = true;
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Halftime reached! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
 			tourneyRestart = true;
-		} else if (bluRnds == totalWinLimit && isHalf2) // blu reaches (totalWinLimit) rounds
+		}
+		else if (bluRnds >= totalWinLimit && isHalf2) // blu reaches (totalWinLimit) rounds
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}The game is over, and {blue}Blu{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
 			tourneyRestart = true;
 		}
-	} 
-// THEORETICALLY this only gets called after a timelimit expires (like when 5cp match goes to timelimit in either half)
-	else if (isHalf2) // is it the 2nd half?
+	}
+	else if (winreason == 5) // ROUND STALEMATE (5cp only)
 	{
-		if (redRnds < bluRnds) // does blu have more points?
+		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white} Stalemate! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
+	}
+	else if (winreason == 6) // TIMELIMIT STALEMATE (server time hits 0)
+	{
+		if (redRnds > bluRnds) // does red have more points?
 		{
-			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The game is over, and {red}Red{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // blu win @ timelimit in half 2
-			tourneyRestart = true;
-		} else if (redRnds < bluRnds) // ok, does red have more points?
-		{
-			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The game is over, and {blue}Blu{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			tourneyRestart = true;
-		} else if (redRnds == bluRnds) // no? golden cap
-		{
-			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! Neither team has won! Exec rgl_6s_5cp_match_gc. The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			tourneyRestart = true;
+			if (isHalf2)
+			{
+				CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The game is over, and {red}Red{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // red win @ timelimit in half 2
+			}
+			else if (!isHalf2)
+			{
+				CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! {red}Red{white} is in the lead! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // red winning @ halftime
+			}
 		}
-	} else if (redRnds < half1Limit && bluRnds < half1Limit) // handles 1st halves going to timelimit
-	{
-		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Halftime reached due to timelimit! The score is {red}Red{white}:{red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-		isHalf2 = true;
+		else if (redRnds < bluRnds) // ok, does blu have more points?
+		{
+			if (isHalf2)
+			{
+			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The game is over, and {blue}Blu{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // blu win @ timelimit in half 2
+			}
+			else if (!isHalf2)
+			{
+				CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! {blue}Blu{white} is in the lead! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // blu winning @ halftime
+			}
+		}
+		else if (redRnds == bluRnds) // no? ok. spit out tie msg
+		{
+			if (isHalf2)
+			{
+				CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! Neither team has won! Setting up golden cap. The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // tie @ end of game, do GC stuff
+				ServerCommand("exec rgl_6s_5cp_gc");
+			}
+			else if (!isHalf2)
+			{
+				CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // tie @ halftime
+			}
+		}
 		tourneyRestart = true;
-	} else // catch all for nonsensical scenarios
+	}
+	else // catch all for nonsensical scenarios
 	{
 		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Something broke, somewhere. The score is {red}Red{white}:{red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
 		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Spitting out debug info: winreason %i, team %i. Score is {red}Red{white}:{red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", winreason, team, redRnds, bluRnds);
 		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}More debug info: half1Limit %i, totalWinLimit %i.", half1Limit, totalWinLimit);
-		if (isHalf2) {
+		if (isHalf2)
+		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}isHalf2 = true");
-		} else {
+		}
+		else
+		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}isHalf2 = false");
 		}
 	}
+	/**^^^ LOGIC HERE ^^^**/
 }
 
 public void EventRoundStart(Event event, const char[] name, bool dontBroadcast) // Round Start Event
 {
-	if (tourneyRestart)
+	if (tourneyRestart) // if a winlimit has been reached, restart the tournament mode on the next round start (instead of immediately) to prevent accidentally shortening of logs
 	{
-	CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Restarting tournament.");
-	ServerCommand("mp_tournament_restart");
-	tourneyRestart = false;
+		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Restarting tournament.");
+		ServerCommand("mp_tournament_restart");
+		tourneyRestart = false;
 	}
 }
-/**^^^ LOGIC HERE ^^^ **/
+
+// shoutouts to my gf, claire, for helping me with this
+// trans rights
