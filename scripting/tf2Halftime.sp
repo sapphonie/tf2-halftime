@@ -5,25 +5,26 @@
 #undef REQUIRE_PLUGIN
 #include <updater>
 
-#define PLUGIN_VERSION	"1.0.7"
+#define PLUGIN_VERSION	"1.1.0"
 #define UPDATE_URL	"https://raw.githubusercontent.com/stephanieLGBT/tf2-halftime/master/updatefile.txt"
 
 
 
 public Plugin myinfo = {
-	name			= "basic halftime for 5cp and koth",
-	author			= "stephanie",
+	name				= "basic halftime for 5cp and koth",
+	author				= "stephanie",
 	description		= "emulates esea style halves for 5cp and koth maps",
 	version			= PLUGIN_VERSION,
-	url				= "https://stephanie.lgbt"
+	url					= "https://stephanie.lgbt"
 };
 
-new bluRnds;					// blu round int created here
-new redRnds;					// blu round int created here
-new bool:isHalf2;				// bool value for determining halftime created here
-new String:mapName[128];
-new half1Limit;
-new totalWinLimit;
+new bluRnds;						// blu round int created here
+new redRnds;						// blu round int created here
+new bool:isHalf2;					// bool value for determining halftime created here
+new String:mapName[128];			// holds map name value to then later check against for determining map type
+new half1Limit;					// int for determining winlimit for half 1
+new totalWinLimit;				// int for determining total winlimit b4 resetting tourney
+new bool:tourneyRestart;			// bool value for determining if we should restart the tournament on the next round start
 
 
 public void OnPluginStart()
@@ -33,6 +34,7 @@ public void OnPluginStart()
 		Updater_AddPlugin(UPDATE_URL);
 	}
 	HookEvent("teamplay_round_win", EventRoundEnd); // hooks round win events
+	HookEvent("teamplay_round_start", EventRoundStart); //hooks round start events
 	SetConVarInt(FindConVar("mp_winlimit"), 0, true); // finds and sets winlimit to 0, as this plugin handles it instead
 }
 
@@ -56,7 +58,6 @@ public void OnMapStart()
 		half1Limit = -1;
 		totalWinLimit = -1;
 	}
-
 }
 
 
@@ -68,9 +69,11 @@ public void OnMapEnd() // resets score and map specific stored vars on map chang
 	isHalf2 = false;
 	half1Limit = 0;
 	totalWinLimit = 0;
+	tourneyRestart = false;
 }
 
-public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) // who fucking knows what this does
+
+public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) // Round End Event
 {
 	int team = event.GetInt("team"); // gets int value of the team who won the round. 2 = red, 3 = blu, anything else is a stalemate
 	int winreason = event.GetInt("winreason"); // gets winreason to prevent incrementing when a stalemate occurs
@@ -87,11 +90,11 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 		{
 			isHalf2 = true;
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Halftime reached! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		} else if (redRnds == totalWinLimit && isHalf2) // red reaches (totalWinLimit) rounds
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}The game is over, and {red}Red{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		}
 	} else if (team == 3 && winreason == 1) // BLU TEAM NON-STALEMATE WIN EVENT
 	{
@@ -101,11 +104,11 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 		{
 			isHalf2 = true;
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Halftime reached! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		} else if (bluRnds == totalWinLimit && isHalf2) // blu reaches (totalWinLimit) rounds
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}The game is over, and {blue}Blu{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		}
 	} 
 // THEORETICALLY this only gets called after a timelimit expires (like when 5cp match goes to timelimit in either half)
@@ -114,21 +117,21 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 		if (redRnds < bluRnds) // does blu have more points?
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The game is over, and {red}Red{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // blu win @ timelimit in half 2
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		} else if (redRnds < bluRnds) // ok, does red have more points?
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! The game is over, and {blue}Blu{white} wins! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		} else if (redRnds == bluRnds) // no? golden cap
 		{
 			CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Timelimit reached! Neither team has won! Exec rgl_6s_5cp_match_gc. The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-			ServerCommand("mp_tournament_restart");
+			tourneyRestart = true;
 		}
 	} else if (redRnds < half1Limit && bluRnds < half1Limit) // handles 1st halves going to timelimit
 	{
 		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Halftime reached due to timelimit! The score is {red}Red{white}:{red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
 		isHalf2 = true;
-		ServerCommand("mp_tournament_restart");
+		tourneyRestart = true;
 	} else // catch all for nonsensical scenarios
 	{
 		CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Something broke, somewhere. The score is {red}Red{white}:{red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
@@ -142,4 +145,13 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 	}
 }
 
+public void EventRoundStart(Event event, const char[] name, bool dontBroadcast) // Round Start Event
+{
+	if (tourneyRestart)
+	{
+	CPrintToChatAll("{mediumpurple}[TF2Halftime] {white}Restarting tournament.");
+	ServerCommand("mp_tournament_restart");
+	tourneyRestart = false;
+	}
+}
 /**^^^ LOGIC HERE ^^^ **/
