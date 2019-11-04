@@ -2,13 +2,13 @@
 
 #include <sourcemod>
 #include <morecolors>
-#define PLUGIN_VERSION	"1.1.3"
+#define PLUGIN_VERSION	"1.2"
 
 public Plugin myinfo = {
 	name				= "basic halftime for 5cp and koth",
 	author				= "stephanie",
-	description		= "emulates esea style halves for 5cp and koth maps",
-	version			= PLUGIN_VERSION,
+	description			= "emulates esea style halves for 5cp and koth maps",
+	version				= PLUGIN_VERSION,
 	url					= "https://stephanie.lgbt"
 };
 
@@ -16,17 +16,19 @@ new bluRnds;						// blu round int created here
 new redRnds;						// blu round int created here
 new bool:isHalf2;					// bool value for determining halftime created here
 new String:mapName[128];			// holds map name value to then later check against for determining map type
-new half1Limit;					// int for determining winlimit for half 1
-new totalWinLimit;				// int for determining total winlimit b4 resetting tourney
+new half1Limit;						// int for determining winlimit for half 1
+new totalWinLimit;					// int for determining total winlimit b4 resetting tourney
 new bool:tourneyRestart;			// bool value for determining if we should restart the tournament on the next round start
-
+new String:staleReason[32];			// why did a stalemate happen?
+new HalfStale;						// if a stalemate happened, was it due to a natural server timelimit being reached, or the winlimit being reached?
 
 public void OnPluginStart()
 {
 	CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}has been {green}loaded{default}.");
-	HookEvent("teamplay_round_win", EventRoundEnd); 		// hooks round win events
-	HookEvent("teamplay_round_start", EventRoundStart); 	// hooks round start events
-	SetConVarInt(FindConVar("mp_winlimit"), 0, true); 	// finds and sets winlimit to 0, as this plugin handles it instead
+	HookEvent("teamplay_game_over", EventGameOver);				// hooks game over events
+	HookEvent("teamplay_round_win", EventRoundEnd); 			// hooks round win events
+	HookEvent("teamplay_round_start", EventRoundStart);		 	// hooks round start events
+	SetConVarInt(FindConVar("mp_winlimit"), 0, true); 			// finds and sets winlimit to 0, as this plugin handles it instead
 }
 
 public void OnMapStart()
@@ -42,7 +44,7 @@ public void OnMapStart()
 		half1Limit = 2;
 		totalWinLimit = 4;
 	}
-	else 												// or something else.
+	else 											// or something else.
 	{
 		half1Limit = -1;
 		totalWinLimit = -1;
@@ -57,17 +59,28 @@ public void OnMapEnd() // resets score and map specific stored vars on map chang
 	isHalf2 = false; 			// unsets halftime, if set
 	mapName = "";				// zeros the mapname string
 	half1Limit = 0; 			// don't set half winlimit until map type is determined above
-	totalWinLimit = 0; 		// don't set winlimit until map type is determined above
+	totalWinLimit = 0; 			// don't set winlimit until map type is determined above
 	tourneyRestart = false; 	// don't restart the tournament on next round start
+	HalfStale = false;			// reset result of timelimit gameover bool, if set
+}
+
+public void EventGameOver(Event event, const char[] name, bool dontBroadcast) // game over event
+{
+	event.GetString("reason", staleReason, sizeof(staleReason));
+	if (strncmp(staleReason, "Reached Time Limit", 32) == 0)
+	{
+	HalfStale = true;	// means we reached the end of the server timelimit, used to differentiate between 5cp round timeouts and map timelimit timeouts
+	}
+	else HalfStale = false;
+	PrintToChatAll("reason %s", staleReason);
 }
 
 
 public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) // Round End Event
 {
-	int team = event.GetInt("team"); 						// gets int value of the team who won the round. 2 = red, 3 = blu, anything else is a stalemate
-	int winreason = event.GetInt("winreason"); 			// gets winreason to prevent incrementing when a stalemate occurs
-
-	/**vvv LOGIC HERE vvv**/
+	int team = event.GetInt("team"); 			// gets int value of the team who won the round. 2 = red, 3 = blu, anything else is a stalemate
+	int winreason = event.GetInt("winreason"); 	// gets winreason to prevent incrementing when a stalemate occurs
+	
 	if (team == 2 && winreason == 1) 				// RED TEAM NON-STALEMATE WIN EVENT
 	{
 		redRnds++; // increments red round counter by +1
@@ -100,13 +113,13 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 			tourneyRestart = true;
 		}
 	}
-	else if (winreason == 5) 						// ROUND STALEMATE (5cp only)
+	else if (winreason == 5 || 6) 					// TIMELIMIT HIT
 	{
-		CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}Stalemate! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
-	}
-	else if (winreason == 6) 						// TIMELIMIT STALEMATE (server time hits 0)
-	{
-		if (redRnds > bluRnds) 								// does red have more points?
+		if (winreason == 5 && !HalfStale && redRnds == bluRnds)	// this covers 5cp round timer stalemates. kind of ugly but source is an ugly engine
+		{
+			CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}Stalemate! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds);
+		}
+		else if (redRnds > bluRnds) 					// does red have more points?
 		{
 			if (isHalf2)
 			{
@@ -117,7 +130,7 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 				CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}Timelimit reached! {red}Red{white} is in the lead! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // red winning @ halftime
 			}
 		}
-		else if (redRnds < bluRnds) 							// ok, does blu have more points?
+		else if (redRnds < bluRnds) 					// ok, does blu have more points?
 		{
 			if (isHalf2)
 			{
@@ -128,7 +141,7 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 				CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}Timelimit reached! {blue}Blu{white} is in the lead! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // blu winning @ halftime
 			}
 		}
-		else if (redRnds == bluRnds) 						// no? ok. spit out tie msg
+		else if (redRnds == bluRnds) 					// no? ok. spit out tie msg
 		{
 			if (isHalf2)
 			{
@@ -140,7 +153,7 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 				CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}Timelimit reached! The score is {red}Red{white}: {red}%i{white}, {blue}Blu{white}: {blue}%i{white}.", redRnds, bluRnds); // tie @ halftime
 			}
 		}
-		tourneyRestart = true;
+		tourneyRestart = false;
 	}
 	else // catch all for nonsensical scenarios
 	{
@@ -156,7 +169,6 @@ public void EventRoundEnd(Event event, const char[] name, bool dontBroadcast) //
 			CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}isHalf2 = false");
 		}
 	}
-	/**^^^ LOGIC HERE ^^^**/
 }
 
 public void EventRoundStart(Event event, const char[] name, bool dontBroadcast) // Round Start Event
@@ -166,6 +178,7 @@ public void EventRoundStart(Event event, const char[] name, bool dontBroadcast) 
 		CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}Issuing mp_tournament_restart...");
 		ServerCommand("mp_tournament_restart");
 		tourneyRestart = false;
+		HalfStale = false;
 	}
 	CPrintToChatAll("{mediumpurple}[tf2Halftime] {white}This server is running tf2Halftime version {mediumpurple}%s", PLUGIN_VERSION);
 }
