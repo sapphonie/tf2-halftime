@@ -31,7 +31,8 @@ public void OnPluginStart()
     HookEvent("teamplay_round_win", EventRoundEnd);                 // hooks round win events
     HookEvent("teamplay_round_start", EventRoundStart);             // hooks round start events
     SetConVarInt(FindConVar("mp_winlimit"), 0, true);               // finds and sets winlimit to 0, as this plugin handles it instead
-    SetConVarInt(FindConVar("mp_tournament_readymode"), 1, true);   // sets readymode to per player
+    //SetConVarInt(FindConVar("mp_tournament_readymode"), 1, true);   // sets readymode to per player
+    // ^ OUTSIDE OF THIS PLUGIN'S SCOPE AND BUGGY! DO NOT USE!
 }
 
 public void OnMapStart()
